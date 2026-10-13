@@ -1,0 +1,33 @@
+{
+  "name": "nusacut-studio",
+  "productName": "NusaCut Studio",
+  "version": "0.1.0",
+  "description": "Video editor desktop dengan fitur AI - auto subtitle, background removal, TTS, auto-cut",
+  "main": "electron/main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"node dev-server.mjs\"",
+    "app": "concurrently -k \"vite\" \"node dev-server.mjs\" \"electron .\"",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.3.0",
+    "@mediapipe/tasks-vision": "^0.10.18",
+    "express": "^4.21.0",
+    "ffmpeg-static": "^5.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
+    "electron": "^33.2.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  }
+}
