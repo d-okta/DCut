@@ -14,6 +14,7 @@ function sorted(clips) {
 }
 
 function projectDuration(p) {
+  if (p.__fixedDuration) return p.__fixedDuration; // ekspor rentang In-Out
   let end = 0;
   for (const t of p.tracks) for (const c of t.clips) end = Math.max(end, c.start + c.duration);
   for (const s of p.subtitles || []) end = Math.max(end, s.end);
@@ -132,12 +133,54 @@ function effectFilters(fx) {
   return parts;
 }
 
+// ---------- persiapan proyek ----------
+
+/**
+ * Salinan proyek yang siap dirender:
+ * - klip nonaktif (Shift+E) dibuang;
+ * - bila ada track audio ber-solo, track audio lain dibisukan;
+ * - bila opts.rangeStart/rangeEnd diisi (ekspor In-Out), hanya rentang itu
+ *   yang dipertahankan dan semuanya digeser supaya rentang mulai di 0.
+ */
+function prepareProject(project, opts) {
+  const p = JSON.parse(JSON.stringify(project));
+  for (const t of p.tracks) t.clips = t.clips.filter((c) => !c.disabled);
+
+  const audio = p.tracks.filter((t) => t.kind === 'audio');
+  if (audio.some((t) => t.solo)) for (const t of audio) if (!t.solo) t.muted = true;
+
+  const a = Number(opts.rangeStart), b = Number(opts.rangeEnd);
+  if (Number.isFinite(a) && Number.isFinite(b) && b - a > 0.02) {
+    const media = (c) => c.kind === 'video' || c.kind === 'audio';
+    for (const t of p.tracks) {
+      const out = [];
+      for (const c of t.clips) {
+        const s = c.start, e = c.start + c.duration;
+        if (e <= a + 1e-4 || s >= b - 1e-4) continue;
+        const ns = Math.max(s, a), ne = Math.min(e, b);
+        if (media(c)) c.sourceIn = (c.sourceIn || 0) + (ns - s) * (c.speed || 1);
+        if (ne < e - 1e-4) c.transitionOut = undefined; // ujung baru di batas Out
+        c.start = ns - a;
+        c.duration = ne - ns;
+        out.push(c);
+      }
+      t.clips = out;
+    }
+    p.subtitles = (p.subtitles || [])
+      .filter((s) => s.end > a && s.start < b)
+      .map((s) => ({ ...s, start: Math.max(0, s.start - a), end: Math.min(b, s.end) - a }));
+    p.__fixedDuration = b - a;
+  }
+  return p;
+}
+
 // ---------- builder utama ----------
 
 /**
  * @returns {{args: string[], total: number, assFile: string|null}}
  */
-function buildExportArgs(project, opts, ctx) {
+function buildExportArgs(rawProject, opts, ctx) {
+  const project = prepareProject(rawProject, opts);
   const { workDir, fontsDir = 'C:/Windows/Fonts', outPath } = ctx;
   const W = opts.width, H = opts.height, FPS = opts.fps;
   const total = projectDuration(project);
@@ -314,6 +357,8 @@ function buildExportArgs(project, opts, ctx) {
     const dt = [
       `fontfile='${font}'`,
       `textfile='${escFilterPath(txtPath)}'`,
+      // Tanpa ini, "%" di teks dibaca drawtext sebagai kode ekspansi dan seluruh teks hilang.
+      'expansion=none',
       `fontsize=${size}`,
       `fontcolor=${(st.color || '#ffffff').replace('#', '0x')}@${(tr.opacity ?? 1).toFixed(3)}`,
       `x=${(tr.x ?? 0.5).toFixed(4)}*w-text_w/2`,
@@ -412,4 +457,4 @@ function buildExportArgs(project, opts, ctx) {
   return { args, total, assFile, cleanupFiles };
 }
 
-module.exports = { buildExportArgs, projectDuration, writeAssFile };
+module.exports = { buildExportArgs, projectDuration, writeAssFile, prepareProject };

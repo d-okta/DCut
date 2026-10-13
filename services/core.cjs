@@ -1,5 +1,5 @@
 // ============================================================
-// NusaCut Studio - layanan backend inti (dipakai Electron main & dev-server).
+// Diandra Cut - layanan backend inti (dipakai Electron main & dev-server).
 // Semua fungsi berbasis ffmpeg-static + PowerShell (TTS/dialog).
 // ============================================================
 const { spawn, execFile } = require('node:child_process');
@@ -9,7 +9,7 @@ const os = require('node:os');
 
 const ffmpegPath = require('ffmpeg-static');
 
-const WORK_DIR = path.join(os.tmpdir(), 'nusacut-work');
+const WORK_DIR = path.join(os.tmpdir(), 'dcut-work');
 fs.mkdirSync(WORK_DIR, { recursive: true });
 
 const MEDIA_PORT = 5174;
@@ -186,7 +186,7 @@ async function pickMediaDialog() {
 Add-Type -AssemblyName System.Windows.Forms
 $dlg = New-Object System.Windows.Forms.OpenFileDialog
 $dlg.Multiselect = $true
-$dlg.Title = 'Pilih media - NusaCut Studio'
+$dlg.Title = 'Pilih media - Diandra Cut'
 $dlg.Filter = 'Media|*.mp4;*.mov;*.mkv;*.webm;*.avi;*.mp3;*.wav;*.m4a;*.aac;*.ogg;*.jpg;*.jpeg;*.png;*.gif;*.bmp;*.webp|Semua file|*.*'
 if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $dlg.FileNames }
 `);

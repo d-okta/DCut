@@ -1,5 +1,5 @@
 // ============================================================
-// NusaCut Studio - proses utama Electron.
+// Diandra Cut - proses utama Electron.
 // ============================================================
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('node:path');
@@ -21,7 +21,7 @@ async function createWindow() {
     minWidth: 1100,
     minHeight: 700,
     backgroundColor: '#0f1115',
-    title: 'NusaCut Studio',
+    title: 'Diandra Cut',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -31,7 +31,7 @@ async function createWindow() {
   win.removeMenu();
 
   const distIndex = path.join(__dirname, '..', 'dist', 'index.html');
-  if (fs.existsSync(distIndex) && !process.env.NUSACUT_DEV) {
+  if (fs.existsSync(distIndex) && !process.env.DCUT_DEV) {
     win.loadFile(distIndex);
   } else {
     // Dev: tunggu vite siap
@@ -92,8 +92,8 @@ ipcMain.handle('export-project', async (_e, project, opts) => {
 ipcMain.handle('save-project', async (_e, project) => {
   const { canceled, filePath } = await dialog.showSaveDialog(win, {
     title: 'Simpan proyek',
-    defaultPath: `${project.name || 'proyek'}.nusacut.json`,
-    filters: [{ name: 'Proyek NusaCut', extensions: ['nusacut.json', 'json'] }],
+    defaultPath: `${project.name || 'proyek'}.dcut.json`,
+    filters: [{ name: 'Proyek Diandra Cut', extensions: ['dcut.json', 'json'] }],
   });
   if (canceled || !filePath) return null;
   fs.writeFileSync(filePath, JSON.stringify(project, null, 2), 'utf8');
@@ -103,7 +103,7 @@ ipcMain.handle('save-project', async (_e, project) => {
 ipcMain.handle('open-project', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog(win, {
     title: 'Buka proyek',
-    filters: [{ name: 'Proyek NusaCut', extensions: ['json'] }],
+    filters: [{ name: 'Proyek Diandra Cut', extensions: ['json'] }],
     properties: ['openFile'],
   });
   if (canceled || !filePaths[0]) return null;

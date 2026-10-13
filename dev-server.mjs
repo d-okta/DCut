@@ -6,5 +6,5 @@ const { startServer } = require('./services/server.cjs');
 const { MEDIA_PORT } = require('./services/core.cjs');
 
 startServer().then(() => {
-  console.log(`[nusacut] dev API + media server berjalan di http://localhost:${MEDIA_PORT}`);
+  console.log(`[dcut] dev API + media server berjalan di http://localhost:${MEDIA_PORT}`);
 });

@@ -1,5 +1,5 @@
 // ============================================================
-// NusaCut Studio - AI Background Removal
+// Diandra Cut - AI Background Removal
 // Menghapus latar belakang video orang memakai MediaPipe
 // ImageSegmenter (model selfie segmenter). Frame diproses satu
 // per satu di renderer (canvas + alpha dari confidence mask),

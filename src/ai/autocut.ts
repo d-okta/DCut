@@ -1,5 +1,5 @@
 // ============================================================
-// NusaCut Studio - Auto-Cut bagian hening
+// Diandra Cut - Auto-Cut bagian hening
 // Mendeteksi rentang hening pada sumber (via FFmpeg silencedetect
 // di backend), lalu menyusun rencana pemotongan: segmen sumber
 // yang DIPERTAHANKAN. Penerapan memakai replaceClipWithSegments

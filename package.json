@@ -1,6 +1,6 @@
 {
-  "name": "nusacut-studio",
-  "productName": "NusaCut Studio",
+  "name": "diandra-cut",
+  "productName": "Diandra Cut",
   "version": "0.1.0",
   "description": "Video editor desktop dengan fitur AI - auto subtitle, background removal, TTS, auto-cut",
   "main": "electron/main.cjs",

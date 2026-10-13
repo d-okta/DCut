@@ -1,14 +1,14 @@
-// Implementasi Bridge untuk Electron - memanggil API dari preload (window.nusacut).
+// Implementasi Bridge untuk Electron - memanggil API dari preload (window.dcut).
 import type { Bridge } from './index';
 import type { ExportProgress } from '../types';
 
-interface NusacutApi {
+interface DcutApi {
   invoke(channel: string, ...args: unknown[]): Promise<unknown>;
   onExportProgress(cb: (p: ExportProgress) => void): () => void;
 }
 
-function api(): NusacutApi {
-  return (window as unknown as { nusacut: NusacutApi }).nusacut;
+function api(): DcutApi {
+  return (window as unknown as { dcut: DcutApi }).dcut;
 }
 
 export const ipcBridge: Bridge = {

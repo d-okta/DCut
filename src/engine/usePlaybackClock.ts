@@ -11,16 +11,18 @@ import { useUi } from '../store/uiStore';
 import { useProject } from '../store/projectStore';
 import { projectDuration } from '../types';
 
-/** Jalankan jam playback global. Cukup dipanggil sekali (di PreviewPlayer). */
+/** Jalankan jam playback global. Cukup dipanggil sekali (di ProgramMonitor). */
 export function usePlaybackClock(): void {
   const playing = useUi((s) => s.playing);
+  // Shuttle J/K/L: kecepatan & arah. Perubahan kecepatan me-rebase jam.
+  const rate = useUi((s) => s.shuttle);
 
   useEffect(() => {
-    if (!playing) return;
+    if (!playing || rate === 0) return;
 
     const ui = useUi.getState();
     const durAwal = projectDuration(useProject.getState().project);
-    if (ui.currentTime >= durAwal - 1 / 60) ui.setCurrentTime(0);
+    if (rate > 0 && ui.currentTime >= durAwal - 1 / 60) ui.setCurrentTime(0);
 
     let wallStart = performance.now();
     let baseT = useUi.getState().currentTime;
@@ -42,11 +44,12 @@ export function usePlaybackClock(): void {
       }
 
       const dur = projectDuration(useProject.getState().project);
-      const t = baseT + (performance.now() - wallStart) / 1000;
+      const t = baseT + ((performance.now() - wallStart) / 1000) * rate;
 
-      if (t >= dur) {
-        lastSet = dur;
-        u.setCurrentTime(dur);
+      if (t >= dur || t <= 0) {
+        const edge = t <= 0 ? 0 : dur;
+        lastSet = edge;
+        u.setCurrentTime(edge);
         u.pause();
         stopped = true;
         return;
@@ -67,5 +70,5 @@ export function usePlaybackClock(): void {
       cancelAnimationFrame(raf);
       clearInterval(backup);
     };
-  }, [playing]);
+  }, [playing, rate]);
 }

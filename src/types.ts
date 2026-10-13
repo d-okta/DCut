@@ -1,5 +1,5 @@
 // ============================================================
-// NusaCut Studio - Model data inti
+// Diandra Cut - Model data inti
 // Semua satuan waktu dalam DETIK (number, boleh pecahan).
 // Koordinat posisi klip dinormalisasi 0..1 relatif ke frame proyek.
 // ============================================================
@@ -105,6 +105,10 @@ export interface Clip {
   /** Untuk kind === 'text' */
   text?: string;
   textStyle?: TextStyle;
+  /** Clip > Enable (Shift+E): false = klip tetap di timeline tapi tidak tampil/berbunyi. */
+  disabled?: boolean;
+  /** Warna label klip (Premiere: Label). Kosong = warna bawaan jenis klip. */
+  label?: string;
 }
 
 export type TrackKind = 'video' | 'overlay' | 'audio';
@@ -115,9 +119,23 @@ export interface Track {
   name: string;
   muted: boolean;
   locked: boolean;
+  /** Solo (track audio): bila ada track ber-solo, hanya track ber-solo yang berbunyi. */
+  solo?: boolean;
   /** Klip TIDAK dijamin terurut; gunakan util sortedClips(). */
   clips: Clip[];
 }
+
+// ---------- Penanda (marker) ----------
+
+export interface Marker {
+  id: string;
+  time: number;
+  name: string;
+  color: string; // hex
+  comment?: string;
+}
+
+export const MARKER_COLORS = ['#3cb371', '#e04a4a', '#9b59d0', '#e8a33d', '#d9d9d9', '#3b8de0', '#2fc1c1', '#e05ab0'];
 
 // ---------- Subtitle ----------
 
@@ -141,6 +159,11 @@ export interface Project {
   subtitleStyle: TextStyle;
   showSubtitles: boolean;
   assets: MediaAsset[];
+  /** Penanda sequence (M). Opsional supaya proyek lama tetap terbaca. */
+  markers?: Marker[];
+  /** Titik In/Out sequence (I/O) - dipakai export rentang & lift/extract. */
+  inPoint?: number;
+  outPoint?: number;
 }
 
 // ---------- Template ----------
@@ -166,6 +189,9 @@ export interface ExportOptions {
   fps: number;
   crf: number;             // 18..28
   burnSubtitles: boolean;
+  /** Rentang yang dirender (detik timeline). Kosong = seluruh sequence. */
+  rangeStart?: number;
+  rangeEnd?: number;
 }
 
 export interface ExportProgress {
@@ -240,13 +266,70 @@ export function createEmptyProject(name = 'Proyek Baru'): Project {
     height: 1080,
     fps: 30,
     tracks: [
-      { id: uid('trk_'), kind: 'video', name: 'Video 1', muted: false, locked: false, clips: [] },
-      { id: uid('trk_'), kind: 'overlay', name: 'Overlay / Teks', muted: false, locked: false, clips: [] },
-      { id: uid('trk_'), kind: 'audio', name: 'Audio 1', muted: false, locked: false, clips: [] },
+      { id: uid('trk_'), kind: 'video', name: 'V1', muted: false, locked: false, clips: [] },
+      { id: uid('trk_'), kind: 'overlay', name: 'V2', muted: false, locked: false, clips: [] },
+      { id: uid('trk_'), kind: 'audio', name: 'A1', muted: false, locked: false, clips: [] },
+      { id: uid('trk_'), kind: 'audio', name: 'A2', muted: false, locked: false, clips: [] },
     ],
     subtitles: [],
     subtitleStyle: { ...DEFAULT_TEXT_STYLE, fontSize: 48 },
     showSubtitles: true,
     assets: [],
+    markers: [],
   };
+}
+
+/** Lengkapi field yang belum ada di proyek lama (dibuka dari file .nusacut.json / versi awal). */
+export function normalizeProject(p: Project): Project {
+  p.markers ??= [];
+  for (const t of p.tracks) t.clips ??= [];
+  return p;
+}
+
+// ---------- Timecode ----------
+
+/** Detik -> "HH:MM:SS:FF" (frame non-drop), seperti timecode Premiere. */
+export function toTimecode(t: number, fps: number): string {
+  const f = Math.max(1, Math.round(fps));
+  const totalFrames = Math.max(0, Math.round(t * f));
+  const ff = totalFrames % f;
+  const s = Math.floor(totalFrames / f);
+  const hh = Math.floor(s / 3600);
+  const mm = Math.floor((s % 3600) / 60);
+  const ss = s % 60;
+  const p2 = (n: number) => String(n).padStart(2, '0');
+  return `${p2(hh)}:${p2(mm)}:${p2(ss)}:${p2(ff)}`;
+}
+
+/**
+ * "HH:MM:SS:FF", "MM:SS:FF", "SS:FF", atau angka frame polos -> detik.
+ * Juga menerima "+30" / "-15" (frame relatif) bila `relativeTo` diberikan.
+ * Mengembalikan null bila tidak bisa dibaca.
+ */
+export function parseTimecode(text: string, fps: number, relativeTo?: number): number | null {
+  const f = Math.max(1, Math.round(fps));
+  const s = text.trim();
+  if (!s) return null;
+  if (/^[+-]\d+$/.test(s) && relativeTo !== undefined) {
+    return Math.max(0, relativeTo + Number(s) / f);
+  }
+  const parts = s.split(/[:;.]/).map((x) => x.trim());
+  if (parts.some((x) => x === '' || !/^\d+$/.test(x))) return null;
+  const n = parts.map(Number);
+  if (n.length === 1) return n[0] / f; // frame polos
+  while (n.length < 4) n.unshift(0);
+  const [hh, mm, ss, ff] = n.slice(-4);
+  return hh * 3600 + mm * 60 + ss + ff / f;
+}
+
+/** Klip ikut tampil/berbunyi? (dinonaktifkan lewat Clip > Enable = tidak). */
+export function clipActive(c: Clip): boolean {
+  return !c.disabled;
+}
+
+/** Track audio ini terdengar? Mengikuti mute dan solo antar-track. */
+export function trackAudible(track: Track, all: Track[]): boolean {
+  if (track.muted) return false;
+  const anySolo = all.some((t) => t.solo);
+  return !anySolo || !!track.solo;
 }

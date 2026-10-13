@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('nusacut', {
+contextBridge.exposeInMainWorld('dcut', {
   invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
   onExportProgress: (cb) => {
     const listener = (_e, p) => cb(p);

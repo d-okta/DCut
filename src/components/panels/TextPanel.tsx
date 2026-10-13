@@ -50,12 +50,12 @@ export default function TextPanel() {
       project.tracks.find((t) => t.kind === 'overlay') ??
       project.tracks.find((t) => t.kind === 'video');
     if (!track) {
-      showToast('Tidak ada track overlay/video untuk menaruh teks');
+      showToast('Tidak ada track video untuk menaruh teks.');
       return;
     }
     const id = addTextClip(track.id, currentTime);
     if (!id) {
-      showToast('Gagal menambah teks - track mungkin terkunci');
+      showToast('Teks tidak bisa ditambahkan: track terkunci.');
       return;
     }
     if (preset) {
@@ -65,15 +65,15 @@ export default function TextPanel() {
       });
     }
     selectClip(id);
-    showToast('Klip teks ditambahkan di posisi playhead');
+    showToast('Klip teks ditambahkan di playhead.');
   };
 
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
-      <div className="panel-title">Teks</div>
+      <div className="panel-title">Grafis teks</div>
       <div className="panel-body">
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => tambahTeks()}>
-          ＋ Tambah Teks
+          Tambah teks di playhead
         </button>
 
         <div className="divider" />
@@ -107,7 +107,7 @@ export default function TextPanel() {
         <div className="divider" />
         <div className="hint">
           Klik klip teks di timeline, lalu edit isi &amp; gayanya (font, warna, outline, posisi)
-          lewat panel Inspector di sebelah kanan.
+          lewat panel Kontrol Efek di kanan atas.
         </div>
       </div>
     </div>

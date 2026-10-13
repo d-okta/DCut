@@ -1,6 +1,6 @@
 // ============================================================
 // Bridge: antarmuka UI <-> backend.
-// Di Electron: implementasi IPC (window.nusacut dari preload).
+// Di Electron: implementasi IPC (window.dcut dari preload).
 // Di browser dev: implementasi HTTP ke dev-server.mjs (proxy /api).
 // ============================================================
 import type {
@@ -51,7 +51,7 @@ import { httpBridge } from './httpBridge';
 import { ipcBridge } from './ipcBridge';
 
 declare global {
-  interface Window { nusacut?: unknown }
+  interface Window { dcut?: unknown }
 }
 
-export const bridge: Bridge = typeof window !== 'undefined' && window.nusacut ? ipcBridge : httpBridge;
+export const bridge: Bridge = typeof window !== 'undefined' && window.dcut ? ipcBridge : httpBridge;

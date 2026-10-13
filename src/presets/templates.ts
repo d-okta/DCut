@@ -102,7 +102,7 @@ export const BUILTIN_TEMPLATES: BuiltinTemplate[] = [
 
 // ---------- Template pengguna (localStorage) ----------
 
-const LS_KEY = 'nusacut_user_templates';
+const LS_KEY = 'dcut_user_templates';
 
 export interface UserTemplate {
   id: string;

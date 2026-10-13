@@ -1,5 +1,5 @@
 // ============================================================
-// PreviewPlayer - preview komposit DOM + transport.
+// ProgramMonitor - hasil sequence (komposit DOM) + transport.
 //
 // Arsitektur:
 // - Stage mengikuti rasio proyek, fit ke container (ResizeObserver).
@@ -18,10 +18,13 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { useProject } from '../store/projectStore';
 import { useUi } from '../store/uiStore';
 import {
-  ADJACENT_EPS, clipEnd, projectDuration, sortedClips, DEFAULT_TEXT_STYLE,
+  ADJACENT_EPS, clipEnd, projectDuration, sortedClips, DEFAULT_TEXT_STYLE, toTimecode, trackAudible,
 } from '../types';
 import type { Clip, ClipEffects, MediaAsset, TextStyle, Track } from '../types';
 import { usePlaybackClock } from '../engine/usePlaybackClock';
+import { attachMeter } from '../engine/audioMeter';
+import { COMMANDS } from '../commands';
+import { MiniRuler, TimecodeField, Transport } from './MonitorBits';
 
 // ---------- util kecil ----------
 
@@ -29,14 +32,7 @@ function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
 }
 
-/** Format "mm:ss.d" (d = sepersepuluh detik). */
-function fmtTime(t: number): string {
-  const x = Math.max(0, t);
-  const m = Math.floor(x / 60);
-  const s = Math.floor(x % 60);
-  const d = Math.floor((x * 10) % 10);
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${d}`;
-}
+const run = (id: string) => () => COMMANDS.find((c) => c.id === id)?.run();
 
 /** Susun CSS filter dari efek klip. `sc` = skala px proyek -> px stage. */
 function cssFilter(fx: ClipEffects, sc: number): string | undefined {
@@ -67,19 +63,25 @@ function textShadowCss(st: TextStyle, k: number): string | undefined {
 
 // ---------- komponen ----------
 
-export default function PreviewPlayer() {
+export default function ProgramMonitor() {
   const project = useProject((s) => s.project);
   const pushHistory = useProject((s) => s.pushHistory);
   const updateTransformLive = useProject((s) => s.updateTransformLive);
 
   const currentTime = useUi((s) => s.currentTime);
   const playing = useUi((s) => s.playing);
+  const shuttle = useUi((s) => s.shuttle);
   const selectedClipId = useUi((s) => s.selectedClipId);
   const selectClip = useUi((s) => s.selectClip);
   const setCurrentTime = useUi((s) => s.setCurrentTime);
   const togglePlay = useUi((s) => s.togglePlay);
+  const gotoOpen = useUi((s) => s.gotoOpen);
+  const setGotoOpen = useUi((s) => s.setGotoOpen);
 
   usePlaybackClock();
+  // Media hanya diputar elemen <video>/<audio> saat maju 1x-8x; mundur ditampilkan per frame.
+  const mediaPlaying = playing && shuttle > 0;
+  const stageRef = useRef<HTMLDivElement | null>(null);
 
   // ----- ukuran stage: fit rasio proyek ke container -----
   const areaRef = useRef<HTMLDivElement | null>(null);
@@ -115,6 +117,7 @@ export default function PreviewPlayer() {
       fn = (el) => {
         if (el) {
           mediaEls.current.set(id, el);
+          attachMeter(el); // meter audio membaca semua elemen yang berbunyi
         } else {
           // Unmount: elemen media yang dilepas dari dokumen TETAP memutar
           // audionya (spec HTML) dan tidak lagi tersentuh loop sinkronisasi.
@@ -152,35 +155,105 @@ export default function PreviewPlayer() {
     // Toleransi seek: saat playing longgar (0.25 dtk, hindari stutter);
     // saat pause ketat (setengah frame) supaya step-frame / scrub kecil
     // benar-benar menampilkan frame baru.
-    const tol = playing ? 0.25 : 1 / (2 * Math.max(1, project.fps));
+    const tol = mediaPlaying ? 0.25 * Math.max(1, shuttle) : 1 / (2 * Math.max(1, project.fps));
     for (const track of project.tracks) {
       for (const clip of track.clips) {
         if (clip.kind !== 'video' && clip.kind !== 'audio') continue;
         const el = mediaEls.current.get(clip.id);
         if (!el) continue;
 
-        const active = currentTime >= clip.start && currentTime < clipEnd(clip);
+        const active = !clip.disabled && currentTime >= clip.start && currentTime < clipEnd(clip);
         if (!active) {
           if (!el.paused) el.pause();
           continue;
         }
         const desired = clip.sourceIn + (currentTime - clip.start) * clip.speed;
+        // Track video mengikuti mute biasa; track audio juga mengikuti solo antar-track.
+        const silent = clip.muted || (track.kind === 'audio' ? !trackAudible(track, project.tracks.filter((t) => t.kind === 'audio')) : track.muted);
         try {
           if (Math.abs(el.currentTime - desired) > tol) el.currentTime = desired;
-          if (el.playbackRate !== clip.speed) el.playbackRate = clip.speed;
-          const vol = clamp01(clip.volume * (clip.muted || track.muted ? 0 : 1));
+          const rate = clip.speed * (mediaPlaying ? shuttle : 1);
+          if (el.playbackRate !== rate) el.playbackRate = Math.min(16, rate);
+          // Shuttle di atas 2x: dibisukan seperti Premiere, supaya tidak memekakkan.
+          const vol = clamp01(clip.volume * (silent || shuttle > 2 ? 0 : 1));
           if (el.volume !== vol) el.volume = vol;
         } catch {
           // media belum siap; frame berikutnya dicoba lagi
         }
-        if (playing) {
+        if (mediaPlaying) {
           if (el.paused) void el.play().catch(() => { /* autoplay ditolak */ });
         } else if (!el.paused) {
           el.pause();
         }
       }
     }
-  }, [currentTime, playing, project]);
+  }, [currentTime, mediaPlaying, shuttle, project]);
+
+  // ----- Ekspor frame (Ctrl+Shift+E): gambar stage ke canvas pada resolusi proyek -----
+  useEffect(() => {
+    const onExportFrame = async () => {
+      const ui = useUi.getState();
+      try {
+        const blob = await renderFrame();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${project.name || 'frame'}_${toTimecode(currentTime, project.fps).replace(/:/g, '-')}.png`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+        ui.showToast('Frame diekspor sebagai PNG.');
+      } catch (e) {
+        ui.showToast(`Gagal mengekspor frame: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    };
+    /** Komposit sederhana: klip dasar + overlay gambar/video yang aktif + teks, pada ukuran proyek. */
+    const renderFrame = async (): Promise<Blob> => {
+      const W = project.width, H = project.height;
+      const cv = document.createElement('canvas');
+      cv.width = W; cv.height = H;
+      const g = cv.getContext('2d');
+      if (!g) throw new Error('canvas tidak tersedia');
+      g.fillStyle = '#000';
+      g.fillRect(0, 0, W, H);
+      const stage = stageRef.current;
+      if (!stage) throw new Error('monitor belum siap');
+      const sr = stage.getBoundingClientRect();
+      const k = W / sr.width;
+      for (const el of stage.querySelectorAll<HTMLElement>('video, img, [data-text]')) {
+        const cs = getComputedStyle(el);
+        if (cs.visibility === 'hidden' || cs.display === 'none') continue;
+        const r = el.getBoundingClientRect();
+        g.save();
+        g.globalAlpha = Number(cs.opacity) || 1;
+        g.filter = cs.filter && cs.filter !== 'none' ? cs.filter : 'none';
+        if (el instanceof HTMLVideoElement || el instanceof HTMLImageElement) {
+          const nw = el instanceof HTMLVideoElement ? el.videoWidth : el.naturalWidth;
+          const nh = el instanceof HTMLVideoElement ? el.videoHeight : el.naturalHeight;
+          if (!nw || !nh) { g.restore(); continue; }
+          // object-fit: contain untuk klip dasar
+          let dx = (r.left - sr.left) * k, dy = (r.top - sr.top) * k, dw = r.width * k, dh = r.height * k;
+          if (cs.objectFit === 'contain') {
+            const s = Math.min(dw / nw, dh / nh);
+            dx += (dw - nw * s) / 2; dy += (dh - nh * s) / 2; dw = nw * s; dh = nh * s;
+          }
+          g.drawImage(el, dx, dy, dw, dh);
+        } else {
+          g.fillStyle = cs.color;
+          g.font = `${cs.fontStyle} ${cs.fontWeight} ${parseFloat(cs.fontSize) * k}px ${cs.fontFamily}`;
+          g.textAlign = 'center';
+          g.textBaseline = 'middle';
+          const lines = (el.textContent ?? '').split('\n');
+          const lh = parseFloat(cs.fontSize) * k * 1.25;
+          const cx = (r.left - sr.left + r.width / 2) * k;
+          const cy = (r.top - sr.top + r.height / 2) * k - ((lines.length - 1) * lh) / 2;
+          lines.forEach((ln, i) => g.fillText(ln, cx, cy + i * lh));
+        }
+        g.restore();
+      }
+      return new Promise((res, rej) => cv.toBlob((b) => (b ? res(b) : rej(new Error('gagal membuat PNG'))), 'image/png'));
+    };
+    window.addEventListener('dcut:export-frame', onExportFrame);
+    return () => window.removeEventListener('dcut:export-frame', onExportFrame);
+  }, [project, currentTime]);
 
   // ----- drag klip overlay/teks di stage -----
   const onClipPointerDown = (e: ReactPointerEvent, clip: Clip) => {
@@ -271,7 +344,7 @@ export default function PreviewPlayer() {
       style.borderRadius = '0.15em';
     }
     return (
-      <div key={clip.id} style={style} onPointerDown={(e) => onClipPointerDown(e, clip)}>
+      <div key={clip.id} data-text style={style} onPointerDown={(e) => onClipPointerDown(e, clip)}>
         {clip.text ?? ''}
       </div>
     );
@@ -281,7 +354,7 @@ export default function PreviewPlayer() {
   const renderVisualTrack = (track: Track, isBase: boolean) => {
     const clips = sortedClips(track);
     return clips.map((clip, i) => {
-      let visible = t >= clip.start && t < clipEnd(clip);
+      let visible = !clip.disabled && t >= clip.start && t < clipEnd(clip);
       let opacity = clip.transform.opacity;
 
       // Transisi dianggap aktif hanya bila export juga menerapkannya:
@@ -345,9 +418,10 @@ export default function PreviewPlayer() {
                 style={mediaStyle}
                 preload="auto"
                 playsInline
+                crossOrigin="anonymous"
               />
             ) : (
-              <img src={asset.url} alt="" style={mediaStyle} draggable={false} />
+              <img src={asset.url} alt="" style={mediaStyle} draggable={false} crossOrigin="anonymous" />
             )}
             {/* Temperature: overlay warna penuh stage, hanya saat klip dasar aktif. */}
             {visible && fx.temperature !== 0 && (
@@ -399,6 +473,7 @@ export default function PreviewPlayer() {
           style={style}
           preload="auto"
           playsInline
+          crossOrigin="anonymous"
           onPointerDown={(e) => onClipPointerDown(e, clip)}
         />
       ) : (
@@ -408,6 +483,7 @@ export default function PreviewPlayer() {
           alt=""
           style={style}
           draggable={false}
+          crossOrigin="anonymous"
           onPointerDown={(e) => onClipPointerDown(e, clip)}
         />
       );
@@ -425,12 +501,14 @@ export default function PreviewPlayer() {
     if (!playing && currentTime >= dur - 0.01) setCurrentTime(0);
     togglePlay();
   };
+  const fps = project.fps;
 
   return (
-    <>
-      <div className="preview-area" ref={areaRef}>
+    <div className="monitor" onPointerDown={() => useUi.getState().setFocusedMonitor('program')}>
+      <div className="monitor-area" ref={areaRef}>
         <div
           className="preview-stage"
+          ref={stageRef}
           style={{ width: stageW, height: stageH }}
           onPointerDown={() => selectClip(null)}
         >
@@ -489,47 +567,55 @@ export default function PreviewPlayer() {
               const asset = assetById.get(clip.assetId);
               if (!asset) return null;
               return (
-                <audio key={clip.id} ref={mediaRef(clip.id)} src={asset.url} preload="auto" />
+                <audio key={clip.id} ref={mediaRef(clip.id)} src={asset.url} preload="auto" crossOrigin="anonymous" />
               );
             }),
           )}
         </div>
+        {playing && shuttle !== 1 && (
+          <div style={{ position: 'absolute', top: 14, right: 16, fontFamily: 'var(--mono)', fontSize: 12, background: 'rgba(0,0,0,.6)', padding: '2px 6px', borderRadius: 2 }}>
+            {shuttle > 0 ? `${shuttle}x` : `${shuttle}x mundur`}
+          </div>
+        )}
       </div>
 
-      <div className="preview-controls">
-        <button
-          className="btn btn-icon btn-ghost"
-          title="Ke awal"
-          onClick={() => setCurrentTime(0)}
-        >
-          ⏮
-        </button>
-        <button
-          className="btn btn-icon btn-ghost"
-          title="Mundur 1 frame"
-          onClick={() => setCurrentTime(currentTime - frameStep)}
-        >
-          ⏴
-        </button>
-        <button
-          className="btn btn-icon btn-primary"
-          style={{ fontSize: 17, padding: '7px 14px' }}
-          title={playing ? 'Jeda (Spasi)' : 'Putar (Spasi)'}
-          onClick={onTogglePlay}
-        >
-          {playing ? '⏸' : '▶'}
-        </button>
-        <button
-          className="btn btn-icon btn-ghost"
-          title="Maju 1 frame"
-          onClick={() => setCurrentTime(Math.min(dur, currentTime + frameStep))}
-        >
-          ⏵
-        </button>
-        <div className="time-display">
-          {fmtTime(currentTime)} / {fmtTime(dur)}
-        </div>
+      <div className="monitor-bar">
+        <TimecodeField
+          time={currentTime}
+          fps={fps}
+          label="Timecode program"
+          forceEdit={gotoOpen}
+          onEditEnd={() => setGotoOpen(false)}
+          onCommit={(v) => setCurrentTime(Math.min(dur, v))}
+        />
+        <span className="hint" style={{ fontSize: 11 }}>{project.width}×{project.height} · {fps} fps</span>
+        <span className="tc-dim" title="Durasi sequence">{toTimecode(dur, fps)}</span>
       </div>
-    </>
+      <MiniRuler
+        time={currentTime}
+        duration={dur}
+        inPoint={project.inPoint}
+        outPoint={project.outPoint}
+        markers={project.markers}
+        onSeek={(v) => setCurrentTime(v)}
+      />
+      <Transport
+        buttons={[
+          { icon: 'marker', label: 'Tambah penanda', keys: 'M', onClick: run('mark.add') },
+          { icon: 'markIn', label: 'Tandai In', keys: 'I', onClick: run('mark.in') },
+          { icon: 'markOut', label: 'Tandai Out', keys: 'O', onClick: run('mark.out') },
+          null,
+          { icon: 'goIn', label: 'Ke In', keys: 'Shift+I', onClick: run('mark.goIn'), disabled: project.inPoint === undefined },
+          { icon: 'stepBack', label: 'Mundur 1 frame', keys: '←', onClick: () => setCurrentTime(currentTime - frameStep) },
+          { icon: playing ? 'pause' : 'play', label: playing ? 'Jeda' : 'Putar', keys: 'Spasi', onClick: onTogglePlay, big: true },
+          { icon: 'stepFwd', label: 'Maju 1 frame', keys: '→', onClick: () => setCurrentTime(Math.min(dur, currentTime + frameStep)) },
+          { icon: 'goOut', label: 'Ke Out', keys: 'Shift+O', onClick: run('mark.goOut'), disabled: project.outPoint === undefined },
+          null,
+          { icon: 'lift', label: 'Lift rentang In-Out', keys: ';', onClick: run('seq.lift') },
+          { icon: 'extract', label: 'Extract rentang In-Out', keys: "'", onClick: run('seq.extract') },
+          { icon: 'camera', label: 'Ekspor frame', keys: 'Ctrl+Shift+E', onClick: run('file.exportFrame') },
+        ]}
+      />
+    </div>
   );
 }

@@ -110,13 +110,13 @@ function createApp() {
   // ---- simpan / buka proyek ----
   app.post('/api/save-project', wrap(async (req) => {
     const project = req.body.project;
-    const p = await core.saveFileDialog(`${project.name || 'proyek'}.nusacut.json`, 'Proyek NusaCut|*.nusacut.json;*.json');
+    const p = await core.saveFileDialog(`${project.name || 'proyek'}.dcut.json`, 'Proyek Diandra Cut|*.dcut.json;*.json');
     if (!p) return null;
     fs.writeFileSync(p, JSON.stringify(project, null, 2), 'utf8');
     return { path: p };
   }));
   app.post('/api/open-project', wrap(async () => {
-    const p = await core.openFileDialog('Proyek NusaCut|*.nusacut.json;*.json|Semua file|*.*');
+    const p = await core.openFileDialog('Proyek Diandra Cut|*.dcut.json;*.nusacut.json;*.json|Semua file|*.*');
     if (!p) return null;
     const project = JSON.parse(fs.readFileSync(p, 'utf8'));
     // segarkan URL media (port/lokasi bisa berubah antar sesi)

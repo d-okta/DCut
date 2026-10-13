@@ -8,7 +8,7 @@ import { bridge } from './bridge';
 
 // Hook debug (hanya mode dev): akses store dari console/otomasi.
 if (import.meta.env.DEV) {
-  (window as unknown as Record<string, unknown>).__nusacut = { useProject, useUi, bridge };
+  (window as unknown as Record<string, unknown>).__dcut = { useProject, useUi, bridge };
 }
 
 createRoot(document.getElementById('root')!).render(
