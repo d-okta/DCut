@@ -75,7 +75,7 @@ export default function MenuBar() {
 
   return (
     <div className="menubar" ref={barRef}>
-      <span className="menubar-brand">Diandra <b>Cut</b></span>
+      <span className="menubar-brand">D<b>Cut</b></span>
       {MENUS.map((m) => (
         <div key={m} className="menu-root">
           <button

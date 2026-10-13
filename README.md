@@ -1,8 +1,8 @@
-# Diandra Cut
+# DCut
 
 Editor video desktop untuk Windows dengan alur kerja seperti Adobe Premiere Pro: Source Monitor dan Program Monitor, timeline multi-track V/A, alat Razor, Ripple, dan Slip, timecode, penanda, In/Out, serta pintasan keyboard yang mengikuti default Premiere. Fitur AI (caption otomatis, hapus latar, suara TTS, auto-cut) berjalan sepenuhnya di komputer.
 
-Dibuat dengan Electron, React, TypeScript, dan FFmpeg.
+Dirancang dan dibangun oleh **Diandra** dengan Electron, React, TypeScript, dan FFmpeg.
 
 ## Menjalankan
 

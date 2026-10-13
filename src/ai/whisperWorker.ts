@@ -1,5 +1,5 @@
 // ============================================================
-// Diandra Cut - Web Worker transkripsi Whisper (lokal)
+// DCut - Web Worker transkripsi Whisper (lokal)
 // Berjalan di thread terpisah supaya UI tidak macet saat inferensi.
 // Dibuat dari sisi client dengan:
 //   new Worker(new URL('./whisperWorker.ts', import.meta.url), { type: 'module' })

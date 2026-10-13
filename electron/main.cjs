@@ -1,5 +1,5 @@
 // ============================================================
-// Diandra Cut - proses utama Electron.
+// DCut - proses utama Electron.
 // ============================================================
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('node:path');
@@ -21,7 +21,7 @@ async function createWindow() {
     minWidth: 1100,
     minHeight: 700,
     backgroundColor: '#0f1115',
-    title: 'Diandra Cut',
+    title: 'DCut',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -93,7 +93,7 @@ ipcMain.handle('save-project', async (_e, project) => {
   const { canceled, filePath } = await dialog.showSaveDialog(win, {
     title: 'Simpan proyek',
     defaultPath: `${project.name || 'proyek'}.dcut.json`,
-    filters: [{ name: 'Proyek Diandra Cut', extensions: ['dcut.json', 'json'] }],
+    filters: [{ name: 'Proyek DCut', extensions: ['dcut.json', 'json'] }],
   });
   if (canceled || !filePath) return null;
   fs.writeFileSync(filePath, JSON.stringify(project, null, 2), 'utf8');
@@ -103,7 +103,7 @@ ipcMain.handle('save-project', async (_e, project) => {
 ipcMain.handle('open-project', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog(win, {
     title: 'Buka proyek',
-    filters: [{ name: 'Proyek Diandra Cut', extensions: ['json'] }],
+    filters: [{ name: 'Proyek DCut', extensions: ['json'] }],
     properties: ['openFile'],
   });
   if (canceled || !filePaths[0]) return null;

@@ -1,5 +1,5 @@
 // ============================================================
-// Diandra Cut - layanan backend inti (dipakai Electron main & dev-server).
+// DCut - layanan backend inti (dipakai Electron main & dev-server).
 // Semua fungsi berbasis ffmpeg-static + PowerShell (TTS/dialog).
 // ============================================================
 const { spawn, execFile } = require('node:child_process');
@@ -186,7 +186,7 @@ async function pickMediaDialog() {
 Add-Type -AssemblyName System.Windows.Forms
 $dlg = New-Object System.Windows.Forms.OpenFileDialog
 $dlg.Multiselect = $true
-$dlg.Title = 'Pilih media - Diandra Cut'
+$dlg.Title = 'Pilih media - DCut'
 $dlg.Filter = 'Media|*.mp4;*.mov;*.mkv;*.webm;*.avi;*.mp3;*.wav;*.m4a;*.aac;*.ogg;*.jpg;*.jpeg;*.png;*.gif;*.bmp;*.webp|Semua file|*.*'
 if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $dlg.FileNames }
 `);

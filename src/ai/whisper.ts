@@ -1,5 +1,5 @@
 // ============================================================
-// Diandra Cut - API transkripsi Whisper (main thread)
+// DCut - API transkripsi Whisper (main thread)
 // Ambil audio WAV (URL dari bridge.extractAudio), decode ke PCM
 // mono 16 kHz, lalu kirim ke Web Worker (whisperWorker.ts) yang
 // menjalankan Whisper secara lokal via @huggingface/transformers.

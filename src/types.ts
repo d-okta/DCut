@@ -1,5 +1,5 @@
 // ============================================================
-// Diandra Cut - Model data inti
+// DCut - Model data inti
 // Semua satuan waktu dalam DETIK (number, boleh pecahan).
 // Koordinat posisi klip dinormalisasi 0..1 relatif ke frame proyek.
 // ============================================================
